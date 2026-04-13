@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  # ── Ollama (LLM server) ─────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Uncomment the lines below for GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+
+  # ── RAG Chatbot (FastAPI) ───────────────────────────────
+  chatbot:
+    build: .
+    container_name: rag-chatbot
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/app/chroma_db
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
+
+volumes:
+  ollama_data:
+  chroma_data:
