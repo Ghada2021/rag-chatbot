@@ -1,0 +1,133 @@
+name: CI - RAG Chatbot
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  # ── JOB 1 : Vérifier la qualité du code ─────────────────
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linters
+        run: pip install flake8
+
+      - name: Check syntax errors
+        run: flake8 app/ --count --select=E9,F63,F7,F82 --show-source
+
+      - name: Check code style
+        run: flake8 app/ --count --max-line-length=120 --statistics
+
+  # ── JOB 2 : Vérifier que tout s'importe correctement ────
+  imports:
+    name: Import Check
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Test all imports
+        run: |
+          python -c "from app.config import OLLAMA_MODEL; print('config OK')"
+          python -c "from app.ingestion import ingest_documents, load_vectorstore; print('ingestion OK')"
+          python -c "from app.rag_chain import build_rag_chain, QA_PROMPT; print('rag_chain OK')"
+          python -c "from app.main import app; print('FastAPI OK')"
+
+  # ── JOB 3 : Tester l'embedding et la recherche ──────────
+  test-rag:
+    name: RAG Pipeline Test
+    runs-on: ubuntu-latest
+    needs: imports
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate knowledge base
+        run: |
+          python -c "
+          import os
+          path = 'data/knowledge_base.txt'
+          assert os.path.exists(path), 'MISSING: knowledge_base.txt'
+          size = os.path.getsize(path)
+          assert size > 100, f'knowledge_base.txt too small: {size} bytes'
+          print(f'Knowledge base OK: {size} bytes')
+          "
+
+      - name: Test embedding model
+        run: |
+          python -c "
+          from app.ingestion import get_embeddings
+          emb = get_embeddings()
+          vec = emb.embed_query('assurance habitation')
+          assert len(vec) == 384, f'Wrong vector size: {len(vec)}'
+          print(f'Embedding OK: {len(vec)} dimensions')
+          "
+
+      - name: Test ingestion + search
+        run: |
+          python -c "
+          from app.ingestion import ingest_documents
+          vs = ingest_documents()
+
+          # Test 1: search DAR ESSLAMA
+          r1 = vs.similarity_search('DAR ESSLAMA', k=2)
+          assert len(r1) > 0, 'No results for DAR ESSLAMA'
+          assert 'habitation' in r1[0].page_content.lower() or 'maison' in r1[0].page_content.lower()
+          print(f'Search DAR ESSLAMA: OK ({len(r1)} chunks)')
+
+          # Test 2: search TRIK ESSLAMA
+          r2 = vs.similarity_search('assurance automobile', k=2)
+          assert len(r2) > 0, 'No results for assurance automobile'
+          print(f'Search TRIK ESSLAMA: OK ({len(r2)} chunks)')
+
+          # Test 3: search pricing
+          r3 = vs.similarity_search('prix 35 dinars', k=2)
+          assert len(r3) > 0, 'No results for pricing'
+          print(f'Search pricing: OK ({len(r3)} chunks)')
+
+          print('All RAG tests passed!')
+          "

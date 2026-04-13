@@ -12,5 +12,5 @@ from app.ingestion import ingest_documents
 
 if __name__ == "__main__":
     ingest_documents()
-    print("\n✅  Done! You can now start the server with:")
+    print("\n  Done! You can now start the server with:")
     print("    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000")

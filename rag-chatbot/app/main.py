@@ -30,10 +30,10 @@ async def lifespan(app: FastAPI):
 
     # If vector store already exists, just load it; otherwise ingest first
     if os.path.exists(CHROMA_PERSIST_DIR):
-        print("📂  Loading existing vector store …")
+        print("  Loading existing vector store …")
         vectorstore = load_vectorstore()
     else:
-        print("🔄  Ingesting knowledge base …")
+        print("  Ingesting knowledge base …")
         vectorstore = ingest_documents()
 
     rag_chain = build_rag_chain(vectorstore)

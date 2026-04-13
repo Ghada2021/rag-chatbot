@@ -41,7 +41,7 @@ def ingest_documents() -> Chroma:
         separators=["\n---\n", "\n\n", "\n", ". ", " ", ""],
     )
     chunks = splitter.split_documents(documents)
-    print(f"✅  Split knowledge base into {len(chunks)} chunks")
+    print(f"  Split knowledge base into {len(chunks)} chunks")
 
     # --- embed & store --------------------------------------------------------
     embeddings = get_embeddings()
@@ -51,7 +51,7 @@ def ingest_documents() -> Chroma:
         persist_directory=CHROMA_PERSIST_DIR,
         collection_name=COLLECTION_NAME,
     )
-    print(f"✅  Vector store created at {CHROMA_PERSIST_DIR}")
+    print(f"  Vector store created at {CHROMA_PERSIST_DIR}")
     return vectorstore
 
 
